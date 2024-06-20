@@ -1,4 +1,3 @@
-# template-3-tier-app-terraform
 <!-- BEGIN_AUTOMATED_TF_DOCS_BLOCK -->
 #### Requirements
 

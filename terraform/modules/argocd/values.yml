@@ -1,0 +1,45 @@
+redis-ha:
+  enabled: false
+
+controller:
+  replicas: 1
+
+server:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+  ingress:
+    enabled: false
+  # extraArgs:
+  #  - --insecure
+
+repoServer:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+
+applicationSet:
+  replicaCount: 2
+
+configs:
+  cm:
+    timeout.reconciliation: "15s"
+
+
+metrics:
+    # -- Enables prometheus metrics server
+    enabled: true
+    # -- Metrics port
+    port: 9001
+    serviceMonitor:
+      # -- Enable a prometheus ServiceMonitor
+      enabled: true
+
+ingressGrpc:
+    # -- Enable an ingress resource for the Argo CD server for dedicated [gRPC-ingress]
+    enabled: true
+    # -- Setup up gRPC ingress to work with an AWS ALB
+    isAWSALB: true
+    ingressClassName: "alb"
+service:
+  type: NodePort

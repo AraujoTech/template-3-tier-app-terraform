@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${environment}-backend-argocd-app
+  namespace: argocd
+spec:
+  destination:
+    name: in-cluster
+    namespace: ${environment}-${workspace}-backend
+    server: ''
+  source:
+      path: ${backend_k8_path}
+      repoURL: ${helm_repo_url}
+      targetRevision: ${backend_target_revision}
+      helm:
+        valueFiles:
+          - values.${workspace}.yaml
+        releaseName:
+        parameters:
+          - name: image_uri
+            value: ${backend_image_uri}
+          - name: hosturl
+            value: app.${workspace}.${hosturl}
+  sources:
+  project: default
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true

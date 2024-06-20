@@ -1,0 +1,109 @@
+
+name: 'Terraform Staging'
+
+on:
+  push:
+    branches: [ "staging" ]
+  pull_request:
+    branches: [ "staging" ]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform:
+    name: 'Terraform Deploy Staging'
+    runs-on: ubuntu-latest
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      working-directory: terraform
+      TF_WORKSPACE: staging
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    # Configure AWS credentials for staging
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: us-east-1
+        role-to-assume: arn:aws:iam::${{ secrets.AWS_STAGING_ACCOUNT }}:role/GitHubInfraAccessRole
+
+    - name: Get Var file
+      run: |
+        chmod +x ./scripts/generate_tfvars.sh
+        ./scripts/generate_tfvars.sh ${{env.TF_WORKSPACE}}
+
+    - name: Terraform fmt
+      id: fmt
+      run: |
+        terraform fmt ${{env.TF_WORKSPACE}}.tfvars
+        terraform fmt -check -recursive
+      working-directory: terraform
+      continue-on-error: true
+
+    - name: Terraform Init
+      id: init
+      working-directory: terraform
+      run: terraform init --upgrade
+
+    - name: Terraform Validate
+      id: validate
+      working-directory: terraform
+      run: terraform validate
+
+    - name: Terraform Plan
+      id: plan
+      working-directory: terraform
+      run: terraform plan --var-file=$(terraform workspace show).tfvars --out=plan
+
+    - name: Plan output
+      id: output
+      uses: actions/github-script@v3
+      if: github.event_name == 'pull_request'
+      env:
+        PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
+      with:
+        github-token: ${{ secrets.GH_PAT }}
+        script: |
+          const output = `#### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+          ### Workspace
+
+          \`${process.env.TF_WORKSPACE}\`
+
+          #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+          #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+          <details><summary>Show Plan</summary>
+
+          \`\`\`hcl
+          ${process.env.PLAN}
+          \`\`\`
+
+          </details>
+
+          **Pusher**: @${{ github.actor }}
+          **Action**: ${{ github.event_name }}
+          `;
+          github.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          })
+
+    - name: Terraform Apply Plan
+      id: apply
+      working-directory: terraform
+      if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
+      run: terraform apply plan

@@ -358,8 +358,3 @@ module "monitoring" {
   slack_webhook = var.general.slack_webhook
 
 }
-
-# module "external-secrets" {
-#   source = "./modules/external-secrets"
-
-# }
